@@ -24,6 +24,7 @@ The product is aimed at students and casual players in Kazakhstan and nearby mar
 ## Differentiators
 
 - **Daily Tactic Sprint:** a dedicated puzzle-like challenge mode that rewards XP.
+- **Daily Tasks:** rotating daily objectives for warm-up moves, captures, coach use, and puzzle starts.
 - **AI Coach Report:** a shareable post-game summary with style DNA, tactical risk, rank, and advice.
 - **Danger Heatmap:** a toggle that marks pieces currently exposed to captures.
 - **Blunder Shield:** warns players before they make a move that gives the opponent an immediate capture.
@@ -33,7 +34,7 @@ The product is aimed at students and casual players in Kazakhstan and nearby mar
 - **City Cup:** a mini tournament layer that makes the prototype feel like a competitive service.
 - **Replay Lab:** a timeline for reviewing tempo and tactical moments.
 - **Focus Mode:** hides the side panel for a cleaner tournament-like board experience.
-- **Capture Animations:** combo feedback, arena badges, and confetti for tactical moments.
+- **Arena Sounds + Capture Animations:** Web Audio move/capture/warning sounds, combo feedback, arena badges, landing motion, board shake, and confetti for tactical moments.
 - **Academy Missions:** retention quests for wins, captures, hints, and daily challenges.
 - **Player Style DNA:** labels players as Hunter, Builder, or Balanced based on their decisions.
 - **Cosmetic Skins:** Classic Arena, Cyber Mint, and Kids School board styles as a monetization path.

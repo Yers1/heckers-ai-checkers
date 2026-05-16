@@ -282,6 +282,7 @@ dialog {
 .square.selected {
   outline: 4px solid var(--gold);
   outline-offset: -4px;
+  animation: selectGlow 0.35s ease;
 }
 
 .square.hint::after,
@@ -328,8 +329,16 @@ dialog {
   animation: piecePop 0.45s ease;
 }
 
+.board.board-shake {
+  animation: boardShake 0.28s ease;
+}
+
 .piece:hover {
   transform: translateY(-2px);
+}
+
+.piece.just-moved {
+  animation: landPiece 0.34s ease;
 }
 
 .piece.white {
@@ -528,6 +537,7 @@ input {
 }
 
 .challenge-card,
+.daily-list article,
 .mission-list article,
 .report-grid article,
 .cup-list article {
@@ -541,6 +551,41 @@ input {
   margin: 7px 0 10px;
   color: var(--muted);
   line-height: 1.45;
+}
+
+.daily-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.daily-list article {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.daily-list article:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-2);
+}
+
+.daily-list button {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--surface);
+  font-weight: 900;
+}
+
+.daily-list small {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .progress-line {
@@ -700,6 +745,40 @@ dialog::backdrop {
   }
   50% {
     filter: brightness(1.22);
+  }
+}
+
+@keyframes selectGlow {
+  from {
+    filter: brightness(1.25);
+  }
+  to {
+    filter: brightness(1);
+  }
+}
+
+@keyframes landPiece {
+  0% {
+    transform: translateY(-10px) scale(0.92);
+  }
+  70% {
+    transform: translateY(2px) scale(1.05);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes boardShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(-5px);
+  }
+  70% {
+    transform: translateX(5px);
   }
 }
 

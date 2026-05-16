@@ -14,6 +14,7 @@ const cityInput = document.querySelector("#cityInput");
 const skinSelect = document.querySelector("#skinSelect");
 const personaSelect = document.querySelector("#personaSelect");
 const shieldToggle = document.querySelector("#shieldToggle");
+const soundToggle = document.querySelector("#soundToggle");
 const replaySlider = document.querySelector("#replaySlider");
 
 const initialBoard = () => {
@@ -42,6 +43,7 @@ let state = loadState() || {
   predictedReply: null,
   combo: 0,
   cupRound: 0,
+  lastMoveTo: null,
   timers: { white: 180, black: 180 },
   lastTick: Date.now()
 };
@@ -51,6 +53,7 @@ state = {
   predictedReply: null,
   combo: 0,
   cupRound: 0,
+  lastMoveTo: null,
   _finished: false,
   ...state,
   timers: { white: 180, black: 180, ...(state.timers || {}) },
@@ -58,10 +61,11 @@ state = {
   snapshots: state.snapshots || []
 };
 
-const defaultStats = { wins: 0, streak: 0, games: 0, xp: 0, captures: 0, hints: 0, challenges: 0 };
+const defaultStats = { wins: 0, streak: 0, games: 0, xp: 0, captures: 0, hints: 0, challenges: 0, daily: {}, dailyStreak: 0 };
 let stats = { ...defaultStats, ...JSON.parse(localStorage.getItem(STATS_KEY) || "{}") };
 let timerId = null;
 let pendingBlunderMove = null;
+let audioContext = null;
 
 const missions = [
   { id: "first_win", title: "Первая победа", detail: "Выиграйте матч против ИИ", goal: 1, value: () => stats.wins },
@@ -84,6 +88,13 @@ const cupOpponents = [
   ["Quarterfinal", "Aruzhan from Алматы", "Opening specialist"],
   ["Semifinal", "Miras from Астана", "Endgame defender"],
   ["Final", "Dana from Шымкент", "Combo hunter"]
+];
+
+const dailyTasks = [
+  { id: "first_move", title: "Разогрев", detail: "Сделайте любой ход", reward: 12, goal: 1 },
+  { id: "capture_one", title: "Охота", detail: "Сделайте одно взятие", reward: 30, goal: 1 },
+  { id: "use_coach", title: "Спросить Coach", detail: "Используйте подсказку", reward: 16, goal: 1 },
+  { id: "daily_puzzle", title: "Double Capture", detail: "Запустите задачу дня", reward: 25, goal: 1 }
 ];
 
 function loadState() {
@@ -163,6 +174,7 @@ function applyMove(move, actor = "player") {
   state.board[move.from[0]][move.from[1]] = null;
   if (move.capture) state.board[move.capture[0]][move.capture[1]] = null;
   state.board[move.to[0]][move.to[1]] = piece;
+  state.lastMoveTo = move.to;
   if ((piece.color === "white" && move.to[0] === 0) || (piece.color === "black" && move.to[0] === 7)) piece.king = true;
 
   const extraCaptures = move.capture ? pieceMoves(state.board, move.to[0], move.to[1], true).filter((m) => m.capture) : [];
@@ -174,9 +186,12 @@ function applyMove(move, actor = "player") {
   });
   if (actor === "player") {
     stats.xp += move.capture ? 18 : 6;
+    tickDaily("first_move");
     if (move.capture) stats.captures += 1;
+    if (move.capture) tickDaily("capture_one");
     state.combo = move.capture ? state.combo + 1 : 0;
     if (move.capture) triggerComboFeedback();
+    playSound(move.capture ? "capture" : "move");
   }
 
   if (extraCaptures.length) {
@@ -225,6 +240,8 @@ function finishGame(summary) {
   } else {
     stats.streak = 0;
   }
+  playSound(state.winner === "white" ? "win" : "warning");
+  spawnConfetti(state.winner === "white" ? 44 : 18);
   coachOutput.textContent = buildPostGameCoach();
   saveState();
 }
@@ -314,6 +331,9 @@ function onSquareClick(r, c) {
   if (activeMove) {
     if (shouldWarnBlunder(activeMove)) {
       pendingBlunderMove = activeMove;
+      boardEl.classList.add("board-shake");
+      setTimeout(() => boardEl.classList.remove("board-shake"), 300);
+      playSound("warning");
       document.querySelector("#blunderText").textContent = `После ${notation(activeMove.from)}-${notation(activeMove.to)} соперник получает ${moveRisk(activeMove)} взятие. Blunder Shield советует пересмотреть ход.`;
       document.querySelector("#blunderDialog").showModal();
       return;
@@ -374,6 +394,62 @@ function triggerComboFeedback() {
   setTimeout(() => boardEl.classList.remove("combo-pop"), 460);
 }
 
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function ensureDailyState() {
+  const key = todayKey();
+  stats.daily ||= {};
+  if (stats.daily.date !== key) {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const completedYesterday = dailyTasks.every((task) => (stats.daily[task.id] || 0) >= task.goal);
+    stats.dailyStreak = stats.daily.date === yesterday && completedYesterday ? (stats.dailyStreak || 0) + 1 : stats.dailyStreak || 0;
+    stats.daily = { date: key };
+  }
+}
+
+function tickDaily(id) {
+  ensureDailyState();
+  const task = dailyTasks.find((item) => item.id === id);
+  if (!task) return;
+  const before = stats.daily[id] || 0;
+  if (before >= task.goal) return;
+  stats.daily[id] = before + 1;
+  if (stats.daily[id] >= task.goal) {
+    stats.xp += task.reward;
+    showArenaBadge(`${task.title} +${task.reward} XP`);
+    playSound("daily");
+    spawnConfetti(10);
+  }
+}
+
+function playSound(type) {
+  if (!soundToggle?.checked) return;
+  audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
+  const now = audioContext.currentTime;
+  const gain = audioContext.createGain();
+  gain.connect(audioContext.destination);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+  const notes = {
+    move: [330, 440],
+    capture: [220, 440, 660],
+    warning: [180, 120],
+    daily: [523, 659, 784],
+    win: [392, 523, 659, 1046]
+  }[type] || [330];
+  notes.forEach((freq, index) => {
+    const osc = audioContext.createOscillator();
+    osc.type = type === "warning" ? "sawtooth" : "sine";
+    osc.frequency.setValueAtTime(freq, now + index * 0.055);
+    osc.connect(gain);
+    osc.start(now + index * 0.055);
+    osc.stop(now + index * 0.055 + 0.13);
+  });
+}
+
 function showArenaBadge(text) {
   const badge = document.querySelector("#arenaBadge");
   badge.textContent = text;
@@ -416,6 +492,7 @@ function render() {
       if (piece) {
         const pieceEl = document.createElement("div");
         pieceEl.className = `piece ${piece.color} ${piece.king ? "king" : ""}`;
+        if (state.lastMoveTo?.[0] === r && state.lastMoveTo?.[1] === c) pieceEl.classList.add("just-moved");
         square.appendChild(pieceEl);
       }
       boardEl.appendChild(square);
@@ -435,6 +512,7 @@ function render() {
   renderLeaderboard();
   renderMissions();
   renderChallenge();
+  renderDailyTasks();
   renderCup();
   renderReplay();
   updateTimers();
@@ -508,6 +586,24 @@ function renderChallenge() {
     : "Найдите цепочку взятий и получите XP. Это делает Heckers не просто игрой, а ежедневной тренировкой.";
 }
 
+function renderDailyTasks() {
+  ensureDailyState();
+  document.querySelector("#dailyList").innerHTML = dailyTasks.map((task) => {
+    const value = Math.min(task.goal, stats.daily[task.id] || 0);
+    const done = value >= task.goal;
+    const action = task.id === "daily_puzzle"
+      ? `<button data-daily="${task.id}" type="button">${done ? "Done" : "Start"}</button>`
+      : `<strong>${value}/${task.goal}</strong>`;
+    return `<article><span><strong>${done ? "✓ " : ""}${task.title}</strong><br><small>${task.detail} · +${task.reward} XP</small></span>${action}</article>`;
+  }).join("");
+  document.querySelectorAll("[data-daily='daily_puzzle']").forEach((button) => {
+    button.addEventListener("click", () => {
+      tickDaily("daily_puzzle");
+      startChallenge();
+    });
+  });
+}
+
 function startChallenge() {
   state.board = challengeBoard();
   state.turn = "white";
@@ -519,11 +615,14 @@ function startChallenge() {
   state.winner = null;
   state.forcedFrom = null;
   state.challenge = { id: "double-capture", captures: 0 };
+  state.lastMoveTo = null;
   state.timers = { white: 180, black: 180 };
   state.lastTick = Date.now();
   document.querySelectorAll("#modeGroup button").forEach((item) => item.classList.toggle("active", item.dataset.mode === "training"));
   document.querySelector("#gameTitle").textContent = "Daily Double Capture";
   coachOutput.textContent = "Daily challenge: начните с a3-c5, затем продолжите цепочку до e7.";
+  tickDaily("daily_puzzle");
+  playSound("daily");
   saveState();
   render();
 }
@@ -535,6 +634,7 @@ function checkChallenge(move, hasChain) {
     stats.xp += 80;
     stats.challenges += 1;
     spawnConfetti(32);
+    playSound("win");
     coachOutput.textContent = "Челлендж закрыт: двойное взятие найдено. +80 XP и прогресс в Academy.";
     state.challenge = null;
   }
@@ -584,6 +684,7 @@ function newGame() {
     predictedReply: null,
     combo: 0,
     cupRound: state.cupRound,
+    lastMoveTo: null,
     timers: { white: 180, black: 180 },
     lastTick: Date.now()
   };
@@ -605,6 +706,8 @@ document.querySelector("#hintButton").addEventListener("click", () => {
   if (!moves.length) return;
   stats.hints += 1;
   stats.xp += 2;
+  tickDaily("use_coach");
+  playSound("move");
   const move = moves.slice().sort((a, b) => (b.capture ? 1 : 0) - (a.capture ? 1 : 0))[0];
   state.selected = move.from;
   state.legalMoves = [move];
@@ -614,6 +717,7 @@ document.querySelector("#hintButton").addEventListener("click", () => {
 document.querySelector("#dangerButton").addEventListener("click", () => {
   state.dangerMap = !state.dangerMap;
   showToast(state.dangerMap ? "Heatmap показывает фигуры под угрозой" : "Heatmap выключен");
+  playSound("move");
   saveState();
   render();
 });
@@ -629,6 +733,7 @@ document.querySelector("#undoButton").addEventListener("click", () => {
   state.legalMoves = [];
   state.predictedReply = null;
   state.combo = 0;
+  state.lastMoveTo = null;
   saveState();
   render();
 });

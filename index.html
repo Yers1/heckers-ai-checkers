@@ -107,6 +107,10 @@
               <input id="shieldToggle" type="checkbox" checked />
               <span>Blunder Shield</span>
             </label>
+            <label class="switch-row">
+              <input id="soundToggle" type="checkbox" checked />
+              <span>Звуки арены</span>
+            </label>
             <label class="field-label" for="cityInput">Город для лидерборда</label>
             <input id="cityInput" type="text" value="Алматы" maxlength="24" />
             <label class="field-label" for="skinSelect">Скин доски</label>
@@ -151,7 +155,7 @@
             <div class="section-head">
               <div>
                 <p class="eyebrow">Daily challenge</p>
-                <h3>Тактический спринт</h3>
+                <h3>Задачи дня</h3>
               </div>
               <button class="icon-button" id="challengeButton" type="button" title="Загрузить задачу">▶</button>
             </div>
@@ -160,6 +164,7 @@
               <p id="challengeText">Найдите цепочку взятий и получите XP. Это делает Heckers не просто игрой, а ежедневной тренировкой.</p>
               <div class="progress-line"><span id="challengeProgress"></span></div>
             </div>
+            <div class="daily-list" id="dailyList"></div>
           </section>
 
           <section class="panel-section">
