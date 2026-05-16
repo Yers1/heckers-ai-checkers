@@ -27,6 +27,20 @@ body.dark {
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
 }
 
+body.skin-cyber {
+  --dark-square: #16484d;
+  --light-square: #b9efe4;
+  --accent: #0f9f8f;
+  --accent-2: #d24f7b;
+}
+
+body.skin-school {
+  --dark-square: #567d46;
+  --light-square: #f5e7a8;
+  --accent: #e2563f;
+  --accent-2: #326cbd;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -220,6 +234,10 @@ dialog {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.62);
   box-shadow: 0 0 0 4px rgba(22, 107, 111, 0.3);
+}
+
+.square.danger {
+  box-shadow: inset 0 0 0 5px rgba(222, 95, 53, 0.72);
 }
 
 .square.capture-hint::after {
@@ -424,6 +442,59 @@ input {
 
 .tab-content.active {
   display: block;
+}
+
+.challenge-card,
+.mission-list article,
+.report-grid article {
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.challenge-card p {
+  margin: 7px 0 10px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.progress-line {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+}
+
+.progress-line span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.mission-list,
+.report-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.mission-list article {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.mission-list small,
+.report-grid small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.mission-list strong.done {
+  color: var(--accent-2);
 }
 
 .move-list {

@@ -11,6 +11,7 @@ const whiteTimer = document.querySelector("#whiteTimer");
 const blackTimer = document.querySelector("#blackTimer");
 const difficultyEl = document.querySelector("#difficulty");
 const cityInput = document.querySelector("#cityInput");
+const skinSelect = document.querySelector("#skinSelect");
 
 const initialBoard = () => {
   const board = Array.from({ length: 8 }, () => Array(8).fill(null));
@@ -33,12 +34,41 @@ let state = loadState() || {
   snapshots: [],
   forcedFrom: null,
   winner: null,
+  dangerMap: false,
+  challenge: null,
   timers: { white: 180, black: 180 },
   lastTick: Date.now()
 };
+state = {
+  dangerMap: false,
+  challenge: null,
+  _finished: false,
+  ...state,
+  timers: { white: 180, black: 180, ...(state.timers || {}) },
+  moves: state.moves || [],
+  snapshots: state.snapshots || []
+};
 
-let stats = JSON.parse(localStorage.getItem(STATS_KEY) || '{"wins":0,"streak":0,"games":0}');
+const defaultStats = { wins: 0, streak: 0, games: 0, xp: 0, captures: 0, hints: 0, challenges: 0 };
+let stats = { ...defaultStats, ...JSON.parse(localStorage.getItem(STATS_KEY) || "{}") };
 let timerId = null;
+
+const missions = [
+  { id: "first_win", title: "Первая победа", detail: "Выиграйте матч против ИИ", goal: 1, value: () => stats.wins },
+  { id: "tactician", title: "Тактик", detail: "Сделайте 5 взятий", goal: 5, value: () => stats.captures },
+  { id: "student", title: "Ученик Coach", detail: "Используйте 3 подсказки", goal: 3, value: () => stats.hints },
+  { id: "daily", title: "Daily Grinder", detail: "Решите 2 челленджа", goal: 2, value: () => stats.challenges }
+];
+
+const challengeBoard = () => {
+  const board = Array.from({ length: 8 }, () => Array(8).fill(null));
+  board[5][0] = { color: "white", king: false };
+  board[4][1] = { color: "black", king: false };
+  board[2][3] = { color: "black", king: false };
+  board[5][4] = { color: "white", king: false };
+  board[0][7] = { color: "black", king: true };
+  return board;
+};
 
 function loadState() {
   try {
@@ -126,6 +156,10 @@ function applyMove(move, actor = "player") {
     text: `${piece.color === "white" ? "White" : "Black"}: ${notation(move.from)}-${notation(move.to)}${move.capture ? " x" : ""}`,
     actor
   });
+  if (actor === "player") {
+    stats.xp += move.capture ? 18 : 6;
+    if (move.capture) stats.captures += 1;
+  }
 
   if (extraCaptures.length) {
     state.forcedFrom = move.to;
@@ -140,6 +174,7 @@ function applyMove(move, actor = "player") {
     explainMove(move, false);
   }
   checkGameOver();
+  checkChallenge(move, extraCaptures.length);
   saveState();
   render();
   maybeAiTurn();
@@ -154,6 +189,8 @@ function checkGameOver() {
 }
 
 function finishGame(summary) {
+  if (state._finished) return;
+  state._finished = true;
   const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
   history.unshift({
     date: new Date().toLocaleString("ru-RU"),
@@ -189,6 +226,21 @@ function evaluateBoard(board) {
     }
   }
   return score;
+}
+
+function rankName() {
+  if (stats.xp >= 900) return "Master";
+  if (stats.xp >= 500) return "Gold";
+  if (stats.xp >= 220) return "Silver";
+  return "Bronze";
+}
+
+function playerStyle() {
+  const total = Math.max(1, state.moves.filter((move) => move.actor === "player").length);
+  const captureRate = state.moves.filter((move) => move.actor === "player" && move.text.includes("x")).length / total;
+  if (captureRate > 0.38) return "Hunter";
+  if (state.moves.length > 16 && captureRate < 0.12) return "Builder";
+  return "Balanced";
 }
 
 function simulate(board, move) {
@@ -260,6 +312,11 @@ function explainMove(move, chain) {
   else coachOutput.textContent = `Позиция стабильна. Следующая цель: занять центр и подготовить проход в дамки.`;
 }
 
+function dangerSquares() {
+  const threats = allMoves(state.board, state.turn === "white" ? "black" : "white").filter((move) => move.capture);
+  return new Set(threats.map((move) => move.capture?.join(",")));
+}
+
 function buildPostGameCoach() {
   const captures = state.moves.filter((move) => move.text.includes("x")).length;
   return `Разбор партии: ${captures} взятий, ${state.moves.length} полуходов. Самая важная идея: в быстрых дуэлях ценнее сохранять цепочки взятий, чем просто идти в дамки.`;
@@ -275,6 +332,7 @@ function render() {
       if (state.selected?.[0] === r && state.selected?.[1] === c) square.classList.add("selected");
       const legal = state.legalMoves.find((move) => move.to[0] === r && move.to[1] === c);
       if (legal) square.classList.add(legal.capture ? "capture-hint" : "hint");
+      if (state.dangerMap && dangerSquares().has(`${r},${c}`)) square.classList.add("danger");
       square.addEventListener("click", () => onSquareClick(r, c));
       const piece = state.board[r][c];
       if (piece) {
@@ -291,8 +349,13 @@ function render() {
   document.querySelector("#movesStat").textContent = state.moves.length;
   document.querySelector("#winsStat").textContent = stats.wins;
   document.querySelector("#streakStat").textContent = stats.streak;
+  document.querySelector("#xpStat").textContent = stats.xp;
+  document.querySelector("#rankStat").textContent = rankName();
+  document.querySelector("#styleStat").textContent = playerStyle();
   renderHistory();
   renderLeaderboard();
+  renderMissions();
+  renderChallenge();
   updateTimers();
 }
 
@@ -315,6 +378,54 @@ function renderLeaderboard() {
   document.querySelector("#leaderboard").innerHTML = players
     .map((player, index) => `<article><span>${index + 1}. ${player[0]}<br><small>${city} league</small></span><strong>${player[1]}</strong></article>`)
     .join("");
+}
+
+function renderMissions() {
+  document.querySelector("#missionList").innerHTML = missions.map((mission) => {
+    const value = Math.min(mission.goal, mission.value());
+    const done = value >= mission.goal;
+    return `<article><span><strong class="${done ? "done" : ""}">${done ? "✓ " : ""}${mission.title}</strong><br><small>${mission.detail}</small></span><strong>${value}/${mission.goal}</strong></article>`;
+  }).join("");
+}
+
+function renderChallenge() {
+  const progress = state.challenge?.captures || 0;
+  document.querySelector("#challengeProgress").style.width = `${Math.min(100, progress * 50)}%`;
+  document.querySelector("#challengeTitle").textContent = state.challenge ? "Активно: Double Capture Lab" : "Double Capture Lab";
+  document.querySelector("#challengeText").textContent = state.challenge
+    ? "Цель: белыми сделать двойное взятие a3-c5-e7. Это демонстрирует ежедневные тактические задачи."
+    : "Найдите цепочку взятий и получите XP. Это делает Heckers не просто игрой, а ежедневной тренировкой.";
+}
+
+function startChallenge() {
+  state.board = challengeBoard();
+  state.turn = "white";
+  state.selected = null;
+  state.legalMoves = [];
+  state.mode = "training";
+  state.moves = [];
+  state.snapshots = [];
+  state.winner = null;
+  state.forcedFrom = null;
+  state.challenge = { id: "double-capture", captures: 0 };
+  state.timers = { white: 180, black: 180 };
+  state.lastTick = Date.now();
+  document.querySelectorAll("#modeGroup button").forEach((item) => item.classList.toggle("active", item.dataset.mode === "training"));
+  document.querySelector("#gameTitle").textContent = "Daily Double Capture";
+  coachOutput.textContent = "Daily challenge: начните с a3-c5, затем продолжите цепочку до e7.";
+  saveState();
+  render();
+}
+
+function checkChallenge(move, hasChain) {
+  if (!state.challenge || !move.capture || move.color === "black") return;
+  state.challenge.captures += 1;
+  if (state.challenge.captures >= 2 && !hasChain) {
+    stats.xp += 80;
+    stats.challenges += 1;
+    coachOutput.textContent = "Челлендж закрыт: двойное взятие найдено. +80 XP и прогресс в Academy.";
+    state.challenge = null;
+  }
 }
 
 function tick() {
@@ -356,6 +467,8 @@ function newGame() {
     snapshots: [],
     forcedFrom: null,
     winner: null,
+    dangerMap: state.dangerMap,
+    challenge: null,
     timers: { white: 180, black: 180 },
     lastTick: Date.now()
   };
@@ -375,10 +488,18 @@ document.querySelector("#newGameButton").addEventListener("click", newGame);
 document.querySelector("#hintButton").addEventListener("click", () => {
   const moves = allMoves(state.board, state.turn);
   if (!moves.length) return;
+  stats.hints += 1;
+  stats.xp += 2;
   const move = moves.slice().sort((a, b) => (b.capture ? 1 : 0) - (a.capture ? 1 : 0))[0];
   state.selected = move.from;
   state.legalMoves = [move];
   coachOutput.textContent = `Подсказка: сыграйте ${notation(move.from)}-${notation(move.to)}${move.capture ? " со взятием" : ""}.`;
+  render();
+});
+document.querySelector("#dangerButton").addEventListener("click", () => {
+  state.dangerMap = !state.dangerMap;
+  showToast(state.dangerMap ? "Heatmap показывает фигуры под угрозой" : "Heatmap выключен");
+  saveState();
   render();
 });
 document.querySelector("#undoButton").addEventListener("click", () => {
@@ -405,6 +526,25 @@ document.querySelector("#coachButton").addEventListener("click", () => {
     ? "В позиции есть обязательное взятие. В шашках это главный фильтр выбора хода."
     : "Сейчас нет обязательных взятий. Ищите ход, который держит центр и не ставит фигуру под удар.";
 });
+document.querySelector("#challengeButton").addEventListener("click", startChallenge);
+document.querySelector("#reportButton").addEventListener("click", () => {
+  const playerMoves = state.moves.filter((move) => move.actor === "player");
+  const captures = playerMoves.filter((move) => move.text.includes("x")).length;
+  const risks = allMoves(state.board, state.turn === "white" ? "black" : "white").filter((move) => move.capture).length;
+  document.querySelector("#reportGrid").innerHTML = [
+    ["Style DNA", `${playerStyle()} (${captures}/${Math.max(1, playerMoves.length)} ходов со взятием)`],
+    ["Tactical Risk", risks ? `${risks} угроз взятия на доске` : "Нет прямых угроз"],
+    ["Progress Loop", `${stats.xp} XP, ранг ${rankName()}, серия ${stats.streak}`],
+    ["Coach Advice", captures ? "Развивайте цепочки: после первого взятия ищите второе." : "Вы играете спокойно: добавьте давление через центр."]
+  ].map(([title, text]) => `<article><strong>${title}</strong><br><small>${text}</small></article>`).join("");
+  document.querySelector("#reportDialog").showModal();
+});
+document.querySelector("#closeReport").addEventListener("click", () => document.querySelector("#reportDialog").close());
+document.querySelector("#copyReport").addEventListener("click", async () => {
+  const text = [...document.querySelectorAll("#reportGrid article")].map((item) => item.innerText).join("\n");
+  await navigator.clipboard?.writeText(text).catch(() => null);
+  showToast("Coach Report скопирован");
+});
 document.querySelector("#themeToggle").addEventListener("click", () => {
   document.body.classList.toggle("dark");
   localStorage.setItem("heckers-theme", document.body.classList.contains("dark") ? "dark" : "light");
@@ -413,6 +553,11 @@ document.querySelector("#proButton").addEventListener("click", () => document.qu
 document.querySelector("#closePro").addEventListener("click", () => document.querySelector("#proDialog").close());
 difficultyEl.addEventListener("change", saveState);
 cityInput.addEventListener("input", renderLeaderboard);
+skinSelect.addEventListener("change", () => {
+  document.body.classList.remove("skin-cyber", "skin-school");
+  if (skinSelect.value !== "classic") document.body.classList.add(`skin-${skinSelect.value}`);
+  localStorage.setItem("heckers-skin", skinSelect.value);
+});
 
 document.querySelectorAll("#modeGroup button").forEach((button) => {
   button.addEventListener("click", () => {
@@ -435,6 +580,9 @@ document.querySelectorAll(".tabs button").forEach((button) => {
 });
 
 if (localStorage.getItem("heckers-theme") === "dark") document.body.classList.add("dark");
+const savedSkin = localStorage.getItem("heckers-skin") || "classic";
+skinSelect.value = savedSkin;
+if (savedSkin !== "classic") document.body.classList.add(`skin-${savedSkin}`);
 timerId = setInterval(tick, 1000);
 render();
 maybeAiTurn();

@@ -52,9 +52,11 @@
 
           <div class="move-bar">
             <button id="hintButton" type="button">Подсказка</button>
+            <button id="dangerButton" type="button">Heatmap</button>
             <button id="undoButton" type="button">Отменить</button>
             <button id="newGameButton" type="button">Новая игра</button>
             <button id="shareButton" type="button">Ссылка другу</button>
+            <button id="reportButton" type="button">Coach Report</button>
           </div>
         </section>
 
@@ -79,6 +81,12 @@
             </select>
             <label class="field-label" for="cityInput">Город для лидерборда</label>
             <input id="cityInput" type="text" value="Алматы" maxlength="24" />
+            <label class="field-label" for="skinSelect">Скин доски</label>
+            <select id="skinSelect">
+              <option value="classic">Classic Arena</option>
+              <option value="cyber">Cyber Mint</option>
+              <option value="school">Kids School</option>
+            </select>
           </section>
 
           <section class="panel-section">
@@ -105,7 +113,35 @@
               <div><span id="winsStat">0</span><small>Побед</small></div>
               <div><span id="streakStat">0</span><small>Серия</small></div>
               <div><span id="movesStat">0</span><small>Ходов</small></div>
+              <div><span id="xpStat">0</span><small>XP</small></div>
+              <div><span id="rankStat">Bronze</span><small>Ранг</small></div>
+              <div><span id="styleStat">Balanced</span><small>Стиль</small></div>
             </div>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Daily challenge</p>
+                <h3>Тактический спринт</h3>
+              </div>
+              <button class="icon-button" id="challengeButton" type="button" title="Загрузить задачу">▶</button>
+            </div>
+            <div class="challenge-card">
+              <strong id="challengeTitle">Double Capture Lab</strong>
+              <p id="challengeText">Найдите цепочку взятий и получите XP. Это делает Heckers не просто игрой, а ежедневной тренировкой.</p>
+              <div class="progress-line"><span id="challengeProgress"></span></div>
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Academy</p>
+                <h3>Миссии</h3>
+              </div>
+            </div>
+            <div class="mission-list" id="missionList"></div>
           </section>
 
           <section class="panel-section">
@@ -151,6 +187,18 @@
         </div>
       </div>
       <button class="primary-button wide" type="button">Подключить за $4.99</button>
+    </dialog>
+
+    <dialog id="reportDialog">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">AI Coach Report</p>
+          <h2>Отчет после партии</h2>
+        </div>
+        <button class="icon-button" id="closeReport" type="button">×</button>
+      </div>
+      <div class="report-grid" id="reportGrid"></div>
+      <button class="primary-button wide" id="copyReport" type="button">Скопировать отчет</button>
     </dialog>
 
     <div class="toast" id="toast" role="status"></div>
