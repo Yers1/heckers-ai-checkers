@@ -56,6 +56,14 @@ body {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+body.focus-mode .side-panel {
+  display: none;
+}
+
+body.focus-mode .layout {
+  grid-template-columns: 1fr;
+}
+
 button,
 input,
 select {
@@ -188,6 +196,57 @@ dialog {
   font-size: 1.25rem;
 }
 
+.insight-ribbon {
+  display: grid;
+  grid-template-columns: 1fr 1fr 120px;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.eval-card,
+.combo-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.combo-card {
+  grid-template-columns: 1fr auto;
+}
+
+.eval-card span,
+.combo-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.eval-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+}
+
+.eval-track i {
+  display: block;
+  width: 50%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-2), var(--gold));
+  transition: width 0.24s ease;
+}
+
+.risk-track i {
+  background: linear-gradient(90deg, var(--gold), var(--accent));
+}
+
 .board-wrap {
   display: grid;
   grid-template-columns: 120px minmax(280px, 680px) 120px;
@@ -240,6 +299,11 @@ dialog {
   box-shadow: inset 0 0 0 5px rgba(222, 95, 53, 0.72);
 }
 
+.square.predicted {
+  animation: predictedPulse 1.15s ease-in-out infinite;
+  box-shadow: inset 0 0 0 5px rgba(215, 160, 47, 0.78);
+}
+
 .square.capture-hint::after {
   width: 54%;
   background: rgba(222, 95, 53, 0.35);
@@ -258,6 +322,10 @@ dialog {
     inset 0 -8px 14px rgba(0, 0, 0, 0.25),
     0 10px 18px rgba(0, 0, 0, 0.22);
   transition: transform 0.16s ease;
+}
+
+.board.combo-pop .piece {
+  animation: piecePop 0.45s ease;
 }
 
 .piece:hover {
@@ -392,6 +460,21 @@ dialog {
   font-weight: 800;
 }
 
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.switch-row input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--accent);
+}
+
 select,
 input {
   width: 100%;
@@ -446,7 +529,8 @@ input {
 
 .challenge-card,
 .mission-list article,
-.report-grid article {
+.report-grid article,
+.cup-list article {
   border: 1px solid var(--line);
   background: var(--surface-strong);
   border-radius: 8px;
@@ -475,12 +559,14 @@ input {
 }
 
 .mission-list,
-.report-grid {
+.report-grid,
+.cup-list {
   display: grid;
   gap: 8px;
 }
 
-.mission-list article {
+.mission-list article,
+.cup-list article {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
@@ -488,7 +574,8 @@ input {
 }
 
 .mission-list small,
-.report-grid small {
+.report-grid small,
+.cup-list small {
   color: var(--muted);
   font-weight: 700;
 }
@@ -552,6 +639,91 @@ dialog::backdrop {
 
 .wide {
   width: 100%;
+}
+
+.compact {
+  min-height: auto;
+  margin-top: 10px;
+}
+
+.dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.move-confirm {
+  min-height: 42px;
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--text);
+  border: 1px solid var(--line);
+  font-weight: 900;
+}
+
+.arena-badge {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--accent-2);
+  color: white;
+  font-weight: 900;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: 0.22s ease;
+  pointer-events: none;
+}
+
+.arena-badge.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.confetti {
+  position: fixed;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: confettiFall 850ms ease-out forwards;
+  pointer-events: none;
+  z-index: 20;
+}
+
+@keyframes predictedPulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.22);
+  }
+}
+
+@keyframes piecePop {
+  0% {
+    transform: scale(0.92);
+  }
+  60% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes confettiFall {
+  from {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(90px) rotate(220deg);
+  }
 }
 
 .toast {
@@ -619,5 +791,13 @@ dialog::backdrop {
 
   .piece {
     width: 78%;
+  }
+
+  .insight-ribbon {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-actions {
+    grid-template-columns: 1fr;
   }
 }

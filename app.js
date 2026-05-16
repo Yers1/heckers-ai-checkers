@@ -1,5 +1,5 @@
-const STORAGE_KEY = "heckers-state-v1";
-const STATS_KEY = "heckers-stats-v1";
+const STORAGE_KEY = "heckers-state-v2";
+const STATS_KEY = "heckers-stats-v2";
 const HISTORY_KEY = "heckers-history-v1";
 
 const boardEl = document.querySelector("#board");
@@ -12,6 +12,9 @@ const blackTimer = document.querySelector("#blackTimer");
 const difficultyEl = document.querySelector("#difficulty");
 const cityInput = document.querySelector("#cityInput");
 const skinSelect = document.querySelector("#skinSelect");
+const personaSelect = document.querySelector("#personaSelect");
+const shieldToggle = document.querySelector("#shieldToggle");
+const replaySlider = document.querySelector("#replaySlider");
 
 const initialBoard = () => {
   const board = Array.from({ length: 8 }, () => Array(8).fill(null));
@@ -36,12 +39,18 @@ let state = loadState() || {
   winner: null,
   dangerMap: false,
   challenge: null,
+  predictedReply: null,
+  combo: 0,
+  cupRound: 0,
   timers: { white: 180, black: 180 },
   lastTick: Date.now()
 };
 state = {
   dangerMap: false,
   challenge: null,
+  predictedReply: null,
+  combo: 0,
+  cupRound: 0,
   _finished: false,
   ...state,
   timers: { white: 180, black: 180, ...(state.timers || {}) },
@@ -52,6 +61,7 @@ state = {
 const defaultStats = { wins: 0, streak: 0, games: 0, xp: 0, captures: 0, hints: 0, challenges: 0 };
 let stats = { ...defaultStats, ...JSON.parse(localStorage.getItem(STATS_KEY) || "{}") };
 let timerId = null;
+let pendingBlunderMove = null;
 
 const missions = [
   { id: "first_win", title: "Первая победа", detail: "Выиграйте матч против ИИ", goal: 1, value: () => stats.wins },
@@ -69,6 +79,12 @@ const challengeBoard = () => {
   board[0][7] = { color: "black", king: true };
   return board;
 };
+
+const cupOpponents = [
+  ["Quarterfinal", "Aruzhan from Алматы", "Opening specialist"],
+  ["Semifinal", "Miras from Астана", "Endgame defender"],
+  ["Final", "Dana from Шымкент", "Combo hunter"]
+];
 
 function loadState() {
   try {
@@ -159,6 +175,8 @@ function applyMove(move, actor = "player") {
   if (actor === "player") {
     stats.xp += move.capture ? 18 : 6;
     if (move.capture) stats.captures += 1;
+    state.combo = move.capture ? state.combo + 1 : 0;
+    if (move.capture) triggerComboFeedback();
   }
 
   if (extraCaptures.length) {
@@ -173,6 +191,7 @@ function applyMove(move, actor = "player") {
     state.turn = state.turn === "white" ? "black" : "white";
     explainMove(move, false);
   }
+  state.predictedReply = null;
   checkGameOver();
   checkChallenge(move, extraCaptures.length);
   saveState();
@@ -228,6 +247,12 @@ function evaluateBoard(board) {
   return score;
 }
 
+function moveRisk(move) {
+  const next = simulate(state.board, move);
+  const opponent = state.turn === "white" ? "black" : "white";
+  return allMoves(next, opponent).filter((candidate) => candidate.capture).length;
+}
+
 function rankName() {
   if (stats.xp >= 900) return "Master";
   if (stats.xp >= 500) return "Gold";
@@ -262,7 +287,13 @@ function chooseAiMove() {
     const next = simulate(state.board, move);
     const danger = allMoves(next, "white").filter((m) => m.capture).length;
     const promotion = move.to[0] === 7 ? 2 : 0;
-    const score = evaluateBoard(next) + (move.capture ? 4 : 0) + promotion - danger * (level === 3 ? 1.7 : 0.8);
+    const center = 3.5 - Math.abs(3.5 - move.to[1]);
+    const persona = personaSelect.value;
+    const personaBonus =
+      persona === "hunter" ? (move.capture ? 4 : -0.2) :
+      persona === "fortress" ? center * 0.45 - danger * 0.7 :
+      danger ? -0.3 : 0.4;
+    const score = evaluateBoard(next) + (move.capture ? 4 : 0) + promotion + personaBonus - danger * (level === 3 ? 1.7 : 0.8);
     return { move, score };
   }).sort((a, b) => b.score - a.score);
   return ranked[0].move;
@@ -281,6 +312,12 @@ function onSquareClick(r, c) {
   const piece = state.board[r][c];
   const activeMove = state.legalMoves.find((move) => move.to[0] === r && move.to[1] === c);
   if (activeMove) {
+    if (shouldWarnBlunder(activeMove)) {
+      pendingBlunderMove = activeMove;
+      document.querySelector("#blunderText").textContent = `После ${notation(activeMove.from)}-${notation(activeMove.to)} соперник получает ${moveRisk(activeMove)} взятие. Blunder Shield советует пересмотреть ход.`;
+      document.querySelector("#blunderDialog").showModal();
+      return;
+    }
     applyMove(activeMove);
     return;
   }
@@ -299,6 +336,19 @@ function analyzeSelection() {
   coachOutput.textContent = captures.length
     ? `Есть обязательное взятие: ${notation(best.from)}-${notation(best.to)}. После него проверьте, доступна ли серия.`
     : `Лучший спокойный ход: ${notation(best.from)}-${notation(best.to)}. Он сохраняет темп и не отдает фигуру сразу.`;
+  predictReply(best);
+}
+
+function shouldWarnBlunder(move) {
+  return shieldToggle.checked && state.turn === "white" && !move.capture && moveRisk(move) > 0;
+}
+
+function predictReply(move) {
+  const next = simulate(state.board, move);
+  const replyColor = state.turn === "white" ? "black" : "white";
+  const replies = allMoves(next, replyColor);
+  const reply = replies.slice().sort((a, b) => (b.capture ? 2 : 0) - (a.capture ? 2 : 0))[0];
+  state.predictedReply = reply ? { from: reply.from, to: reply.to } : null;
 }
 
 function explainMove(move, chain) {
@@ -317,6 +367,33 @@ function dangerSquares() {
   return new Set(threats.map((move) => move.capture?.join(",")));
 }
 
+function triggerComboFeedback() {
+  boardEl.classList.add("combo-pop");
+  showArenaBadge(state.combo > 1 ? `Combo x${state.combo}` : "Capture +18 XP");
+  spawnConfetti(14 + state.combo * 4);
+  setTimeout(() => boardEl.classList.remove("combo-pop"), 460);
+}
+
+function showArenaBadge(text) {
+  const badge = document.querySelector("#arenaBadge");
+  badge.textContent = text;
+  badge.classList.add("show");
+  setTimeout(() => badge.classList.remove("show"), 1600);
+}
+
+function spawnConfetti(count) {
+  for (let i = 0; i < count; i += 1) {
+    const bit = document.createElement("span");
+    bit.className = "confetti";
+    bit.style.left = `${45 + Math.random() * 14}vw`;
+    bit.style.top = `${18 + Math.random() * 18}vh`;
+    bit.style.background = i % 3 === 0 ? "var(--accent)" : i % 3 === 1 ? "var(--accent-2)" : "var(--gold)";
+    bit.style.animationDelay = `${Math.random() * 180}ms`;
+    document.body.appendChild(bit);
+    setTimeout(() => bit.remove(), 1100);
+  }
+}
+
 function buildPostGameCoach() {
   const captures = state.moves.filter((move) => move.text.includes("x")).length;
   return `Разбор партии: ${captures} взятий, ${state.moves.length} полуходов. Самая важная идея: в быстрых дуэлях ценнее сохранять цепочки взятий, чем просто идти в дамки.`;
@@ -333,6 +410,7 @@ function render() {
       const legal = state.legalMoves.find((move) => move.to[0] === r && move.to[1] === c);
       if (legal) square.classList.add(legal.capture ? "capture-hint" : "hint");
       if (state.dangerMap && dangerSquares().has(`${r},${c}`)) square.classList.add("danger");
+      if (state.predictedReply && (state.predictedReply.from.join(",") === `${r},${c}` || state.predictedReply.to.join(",") === `${r},${c}`)) square.classList.add("predicted");
       square.addEventListener("click", () => onSquareClick(r, c));
       const piece = state.board[r][c];
       if (piece) {
@@ -352,11 +430,25 @@ function render() {
   document.querySelector("#xpStat").textContent = stats.xp;
   document.querySelector("#rankStat").textContent = rankName();
   document.querySelector("#styleStat").textContent = playerStyle();
+  renderInsights();
   renderHistory();
   renderLeaderboard();
   renderMissions();
   renderChallenge();
+  renderCup();
+  renderReplay();
   updateTimers();
+}
+
+function renderInsights() {
+  const evalScore = Math.max(-10, Math.min(10, -evaluateBoard(state.board)));
+  const evalWidth = Math.round(((evalScore + 10) / 20) * 100);
+  const risks = allMoves(state.board, state.turn === "white" ? "black" : "white").filter((move) => move.capture).length;
+  document.querySelector("#evalBar").style.width = `${evalWidth}%`;
+  document.querySelector("#evalText").textContent = evalScore > 0 ? `+${evalScore.toFixed(1)}` : evalScore.toFixed(1);
+  document.querySelector("#riskBar").style.width = `${Math.min(100, risks * 24)}%`;
+  document.querySelector("#riskText").textContent = risks ? `${risks} threat` : "Safe";
+  document.querySelector("#comboText").textContent = `x${state.combo || 0}`;
 }
 
 function renderHistory() {
@@ -386,6 +478,25 @@ function renderMissions() {
     const done = value >= mission.goal;
     return `<article><span><strong class="${done ? "done" : ""}">${done ? "✓ " : ""}${mission.title}</strong><br><small>${mission.detail}</small></span><strong>${value}/${mission.goal}</strong></article>`;
   }).join("");
+}
+
+function renderCup() {
+  document.querySelector("#cupList").innerHTML = cupOpponents.map((round, index) => {
+    const status = index < state.cupRound ? "Won" : index === state.cupRound ? "Now" : "Locked";
+    return `<article><span><strong>${round[0]}: ${round[1]}</strong><br><small>${round[2]}</small></span><strong>${status}</strong></article>`;
+  }).join("");
+}
+
+function renderReplay() {
+  replaySlider.max = String(Math.max(0, state.moves.length));
+  replaySlider.value = String(Math.min(Number(replaySlider.value || 0), state.moves.length));
+  if (!state.moves.length) {
+    document.querySelector("#replayOutput").textContent = "После нескольких ходов здесь появится таймлайн партии.";
+    return;
+  }
+  const index = Number(replaySlider.value || state.moves.length);
+  const move = state.moves[Math.max(0, index - 1)] || state.moves[state.moves.length - 1];
+  document.querySelector("#replayOutput").textContent = `Tempo point ${index || state.moves.length}: ${move.text}. Coach оценивает этот момент как ${move.text.includes("x") ? "тактический скачок" : "позиционную подготовку"}.`;
 }
 
 function renderChallenge() {
@@ -423,6 +534,7 @@ function checkChallenge(move, hasChain) {
   if (state.challenge.captures >= 2 && !hasChain) {
     stats.xp += 80;
     stats.challenges += 1;
+    spawnConfetti(32);
     coachOutput.textContent = "Челлендж закрыт: двойное взятие найдено. +80 XP и прогресс в Academy.";
     state.challenge = null;
   }
@@ -469,6 +581,9 @@ function newGame() {
     winner: null,
     dangerMap: state.dangerMap,
     challenge: null,
+    predictedReply: null,
+    combo: 0,
+    cupRound: state.cupRound,
     timers: { white: 180, black: 180 },
     lastTick: Date.now()
   };
@@ -512,6 +627,8 @@ document.querySelector("#undoButton").addEventListener("click", () => {
   state.winner = null;
   state.selected = null;
   state.legalMoves = [];
+  state.predictedReply = null;
+  state.combo = 0;
   saveState();
   render();
 });
@@ -527,6 +644,15 @@ document.querySelector("#coachButton").addEventListener("click", () => {
     : "Сейчас нет обязательных взятий. Ищите ход, который держит центр и не ставит фигуру под удар.";
 });
 document.querySelector("#challengeButton").addEventListener("click", startChallenge);
+document.querySelector("#cupButton").addEventListener("click", () => {
+  state.cupRound = Math.min(cupOpponents.length, state.cupRound + 1);
+  stats.xp += 35;
+  showArenaBadge(state.cupRound >= cupOpponents.length ? "City Cup Champion" : "Round advanced +35 XP");
+  if (state.cupRound >= cupOpponents.length) spawnConfetti(36);
+  saveState();
+  render();
+});
+replaySlider.addEventListener("input", renderReplay);
 document.querySelector("#reportButton").addEventListener("click", () => {
   const playerMoves = state.moves.filter((move) => move.actor === "player");
   const captures = playerMoves.filter((move) => move.text.includes("x")).length;
@@ -540,6 +666,17 @@ document.querySelector("#reportButton").addEventListener("click", () => {
   document.querySelector("#reportDialog").showModal();
 });
 document.querySelector("#closeReport").addEventListener("click", () => document.querySelector("#reportDialog").close());
+document.querySelector("#closeBlunder").addEventListener("click", () => document.querySelector("#blunderDialog").close());
+document.querySelector("#cancelBlunder").addEventListener("click", () => {
+  pendingBlunderMove = null;
+  document.querySelector("#blunderDialog").close();
+});
+document.querySelector("#playAnyway").addEventListener("click", () => {
+  const move = pendingBlunderMove;
+  pendingBlunderMove = null;
+  document.querySelector("#blunderDialog").close();
+  if (move) applyMove(move);
+});
 document.querySelector("#copyReport").addEventListener("click", async () => {
   const text = [...document.querySelectorAll("#reportGrid article")].map((item) => item.innerText).join("\n");
   await navigator.clipboard?.writeText(text).catch(() => null);
@@ -552,11 +689,19 @@ document.querySelector("#themeToggle").addEventListener("click", () => {
 document.querySelector("#proButton").addEventListener("click", () => document.querySelector("#proDialog").showModal());
 document.querySelector("#closePro").addEventListener("click", () => document.querySelector("#proDialog").close());
 difficultyEl.addEventListener("change", saveState);
+personaSelect.addEventListener("change", () => {
+  document.querySelector("#blackLabel").textContent = personaSelect.options[personaSelect.selectedIndex].text.split(":")[0];
+  saveState();
+});
 cityInput.addEventListener("input", renderLeaderboard);
 skinSelect.addEventListener("change", () => {
   document.body.classList.remove("skin-cyber", "skin-school");
   if (skinSelect.value !== "classic") document.body.classList.add(`skin-${skinSelect.value}`);
   localStorage.setItem("heckers-skin", skinSelect.value);
+});
+document.querySelector("#focusButton").addEventListener("click", () => {
+  document.body.classList.toggle("focus-mode");
+  showToast(document.body.classList.contains("focus-mode") ? "Focus mode включен" : "Focus mode выключен");
 });
 
 document.querySelectorAll("#modeGroup button").forEach((button) => {

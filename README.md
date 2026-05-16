@@ -26,6 +26,14 @@ The product is aimed at students and casual players in Kazakhstan and nearby mar
 - **Daily Tactic Sprint:** a dedicated puzzle-like challenge mode that rewards XP.
 - **AI Coach Report:** a shareable post-game summary with style DNA, tactical risk, rank, and advice.
 - **Danger Heatmap:** a toggle that marks pieces currently exposed to captures.
+- **Blunder Shield:** warns players before they make a move that gives the opponent an immediate capture.
+- **Live Eval + Risk Meter:** a real-time arena ribbon that shows position evaluation, danger, and combo state.
+- **Predicted Reply:** highlights the likely response after the player selects a move.
+- **AI Personas:** Coach, Hunter, and Fortress opponents change the AI's play style.
+- **City Cup:** a mini tournament layer that makes the prototype feel like a competitive service.
+- **Replay Lab:** a timeline for reviewing tempo and tactical moments.
+- **Focus Mode:** hides the side panel for a cleaner tournament-like board experience.
+- **Capture Animations:** combo feedback, arena badges, and confetti for tactical moments.
 - **Academy Missions:** retention quests for wins, captures, hints, and daily challenges.
 - **Player Style DNA:** labels players as Hunter, Builder, or Balanced based on their decisions.
 - **Cosmetic Skins:** Classic Arena, Cyber Mint, and Kids School board styles as a monetization path.
