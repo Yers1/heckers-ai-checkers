@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Heckers AI Checkers</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-mark">H</div>
+          <div>
+            <p class="eyebrow">AI checkers arena</p>
+            <h1>Heckers</h1>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button class="ghost-button" id="themeToggle" type="button" title="Сменить тему">☼</button>
+          <button class="primary-button" id="proButton" type="button">Upgrade to Pro</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="game-area">
+          <div class="status-strip">
+            <div>
+              <p class="eyebrow">Текущий матч</p>
+              <h2 id="gameTitle">Быстрая дуэль</h2>
+            </div>
+            <div class="scoreline">
+              <span id="turnBadge">Ход белых</span>
+              <strong id="scoreText">12 : 12</strong>
+            </div>
+          </div>
+
+          <div class="board-wrap">
+            <div class="timer-panel player-top">
+              <span id="blackLabel">AI Coach</span>
+              <strong id="blackTimer">03:00</strong>
+            </div>
+            <div class="board" id="board" aria-label="Игровая доска 8 на 8"></div>
+            <div class="timer-panel player-bottom">
+              <span id="whiteLabel">Вы</span>
+              <strong id="whiteTimer">03:00</strong>
+            </div>
+          </div>
+
+          <div class="move-bar">
+            <button id="hintButton" type="button">Подсказка</button>
+            <button id="undoButton" type="button">Отменить</button>
+            <button id="newGameButton" type="button">Новая игра</button>
+            <button id="shareButton" type="button">Ссылка другу</button>
+          </div>
+        </section>
+
+        <aside class="side-panel">
+          <section class="panel-section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Режим</p>
+                <h3>Игровая сессия</h3>
+              </div>
+            </div>
+            <div class="segmented" id="modeGroup">
+              <button class="active" data-mode="ai" type="button">AI</button>
+              <button data-mode="local" type="button">2 игрока</button>
+              <button data-mode="training" type="button">Тренировка</button>
+            </div>
+            <label class="field-label" for="difficulty">Сложность ИИ</label>
+            <select id="difficulty">
+              <option value="1">Rookie</option>
+              <option value="2" selected>Smart</option>
+              <option value="3">Tactical</option>
+            </select>
+            <label class="field-label" for="cityInput">Город для лидерборда</label>
+            <input id="cityInput" type="text" value="Алматы" maxlength="24" />
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">AI Coach</p>
+                <h3>Разбор позиции</h3>
+              </div>
+              <button class="icon-button" id="coachButton" type="button" title="Обновить анализ">↻</button>
+            </div>
+            <div class="coach-card" id="coachOutput">
+              Выберите фигуру: я подсвечу легальные ходы и объясню лучший план.
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Retention</p>
+                <h3>Прогресс</h3>
+              </div>
+            </div>
+            <div class="stats-grid">
+              <div><span id="winsStat">0</span><small>Побед</small></div>
+              <div><span id="streakStat">0</span><small>Серия</small></div>
+              <div><span id="movesStat">0</span><small>Ходов</small></div>
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <div class="tabs">
+              <button class="active" data-tab="moves" type="button">Ходы</button>
+              <button data-tab="history" type="button">История</button>
+              <button data-tab="leaderboard" type="button">Топ</button>
+            </div>
+            <div class="tab-content active" id="movesTab">
+              <ol class="move-list" id="moveList"></ol>
+            </div>
+            <div class="tab-content" id="historyTab">
+              <div class="history-list" id="historyList"></div>
+            </div>
+            <div class="tab-content" id="leaderboardTab">
+              <div class="leaderboard" id="leaderboard"></div>
+            </div>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <dialog id="proDialog">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Heckers Pro</p>
+          <h2>Монетизация уже в прототипе</h2>
+        </div>
+        <button class="icon-button" id="closePro" type="button">×</button>
+      </div>
+      <div class="pricing-grid">
+        <div>
+          <strong>Coach+</strong>
+          <p>Глубокий анализ партий, тренировки слабых зон и персональные задачи.</p>
+        </div>
+        <div>
+          <strong>Skins</strong>
+          <p>Кастомные наборы досок и фигур для быстрых дуэлей.</p>
+        </div>
+        <div>
+          <strong>City League</strong>
+          <p>Сезоны, рейтинги по городам и приватные матчи по ссылке.</p>
+        </div>
+      </div>
+      <button class="primary-button wide" type="button">Подключить за $4.99</button>
+    </dialog>
+
+    <div class="toast" id="toast" role="status"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
