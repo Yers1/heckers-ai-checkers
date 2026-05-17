@@ -16,6 +16,9 @@ const personaSelect = document.querySelector("#personaSelect");
 const shieldToggle = document.querySelector("#shieldToggle");
 const soundToggle = document.querySelector("#soundToggle");
 const replaySlider = document.querySelector("#replaySlider");
+const wsUrlInput = document.querySelector("#wsUrlInput");
+const roomInput = document.querySelector("#roomInput");
+const roomStatus = document.querySelector("#roomStatus");
 
 const initialBoard = () => {
   const board = Array.from({ length: 8 }, () => Array(8).fill(null));
@@ -44,6 +47,9 @@ let state = loadState() || {
   combo: 0,
   cupRound: 0,
   lastMoveTo: null,
+  roomId: "",
+  onlineRole: null,
+  onlineConnected: false,
   timers: { white: 180, black: 180 },
   lastTick: Date.now()
 };
@@ -54,6 +60,9 @@ state = {
   combo: 0,
   cupRound: 0,
   lastMoveTo: null,
+  roomId: "",
+  onlineRole: null,
+  onlineConnected: false,
   _finished: false,
   ...state,
   timers: { white: 180, black: 180, ...(state.timers || {}) },
@@ -66,6 +75,7 @@ let stats = { ...defaultStats, ...JSON.parse(localStorage.getItem(STATS_KEY) || 
 let timerId = null;
 let pendingBlunderMove = null;
 let audioContext = null;
+let socket = null;
 
 const missions = [
   { id: "first_win", title: "Первая победа", detail: "Выиграйте матч против ИИ", goal: 1, value: () => stats.wins },
@@ -95,6 +105,15 @@ const dailyTasks = [
   { id: "capture_one", title: "Охота", detail: "Сделайте одно взятие", reward: 30, goal: 1 },
   { id: "use_coach", title: "Спросить Coach", detail: "Используйте подсказку", reward: 16, goal: 1 },
   { id: "daily_puzzle", title: "Double Capture", detail: "Запустите задачу дня", reward: 25, goal: 1 }
+];
+
+const unlocks = [
+  { id: "classic", title: "Classic Arena", detail: "Базовый стиль арены", type: "skin", requirement: "Доступно сразу", unlocked: () => true },
+  { id: "cyber", title: "Cyber Mint", detail: "Откройте через 50 XP", type: "skin", requirement: "50 XP", unlocked: () => stats.xp >= 50 },
+  { id: "school", title: "Kids School", detail: "Откройте через первую подсказку", type: "skin", requirement: "1 подсказка", unlocked: () => stats.hints >= 1 },
+  { id: "neon", title: "Neon League", detail: "Киберспортивный стол с ярким контрастом", type: "skin", requirement: "220 XP или Silver", unlocked: () => stats.xp >= 220 },
+  { id: "royal", title: "Royal Wood", detail: "Премиальный деревянный стол для City Cup", type: "skin", requirement: "1 раунд City Cup", unlocked: () => state.cupRound >= 1 },
+  { id: "glass", title: "Glass Pro", detail: "Прозрачный Pro-стиль для сильных игроков", type: "skin", requirement: "2 daily-задачи", unlocked: () => completedDailyCount() >= 2 || stats.challenges >= 1 }
 ];
 
 function loadState() {
@@ -168,9 +187,10 @@ function notation([r, c]) {
   return `${String.fromCharCode(97 + c)}${8 - r}`;
 }
 
-function applyMove(move, actor = "player") {
+function applyMove(move, actor = "player", options = {}) {
   const before = cloneBoard(state.board);
   const piece = state.board[move.from[0]][move.from[1]];
+  if (!piece) return;
   state.board[move.from[0]][move.from[1]] = null;
   if (move.capture) state.board[move.capture[0]][move.capture[1]] = null;
   state.board[move.to[0]][move.to[1]] = piece;
@@ -211,6 +231,9 @@ function applyMove(move, actor = "player") {
   checkChallenge(move, extraCaptures.length);
   saveState();
   render();
+  if (state.mode === "online" && actor === "player" && !options.remote) {
+    sendRoomMessage({ type: "move", move, board: state.board, turn: state.turn, forcedFrom: state.forcedFrom, winner: state.winner });
+  }
   maybeAiTurn();
 }
 
@@ -326,6 +349,10 @@ function maybeAiTurn() {
 
 function onSquareClick(r, c) {
   if (state.winner || (state.mode === "ai" && state.turn === "black")) return;
+  if (state.mode === "online" && state.onlineRole && state.turn !== state.onlineRole) {
+    showToast(`Сейчас ход ${state.turn === "white" ? "белых" : "черных"}. Вы играете за ${state.onlineRole === "white" ? "белых" : "черных"}.`);
+    return;
+  }
   const piece = state.board[r][c];
   const activeMove = state.legalMoves.find((move) => move.to[0] === r && move.to[1] === c);
   if (activeMove) {
@@ -424,6 +451,61 @@ function tickDaily(id) {
   }
 }
 
+function completedDailyCount() {
+  ensureDailyState();
+  return dailyTasks.filter((task) => (stats.daily[task.id] || 0) >= task.goal).length;
+}
+
+function isSkinUnlocked(skin) {
+  return unlocks.find((item) => item.id === skin)?.unlocked() ?? false;
+}
+
+function clearSkinClasses() {
+  document.body.classList.remove("skin-cyber", "skin-school", "skin-neon", "skin-royal", "skin-glass");
+}
+
+function applySkin(skin, persist = true) {
+  const nextSkin = isSkinUnlocked(skin) ? skin : "classic";
+  clearSkinClasses();
+  if (nextSkin !== "classic") document.body.classList.add(`skin-${nextSkin}`);
+  skinSelect.value = nextSkin;
+  if (persist) localStorage.setItem("heckers-skin", nextSkin);
+  renderUnlockOptions();
+}
+
+function renderUnlockOptions() {
+  [...skinSelect.options].forEach((option) => {
+    const unlocked = isSkinUnlocked(option.value);
+    option.disabled = !unlocked;
+    const item = unlocks.find((unlock) => unlock.id === option.value);
+    option.textContent = item ? `${item.title}${unlocked ? "" : " · locked"}` : option.textContent;
+  });
+}
+
+function renderMenu() {
+  document.querySelector("#menuStats").innerHTML = [
+    ["XP", stats.xp],
+    ["Rank", rankName()],
+    ["Daily", `${completedDailyCount()}/${dailyTasks.length}`],
+    ["Style", playerStyle()],
+    ["Wins", stats.wins],
+    ["Cup", `${Math.min(state.cupRound, cupOpponents.length)}/${cupOpponents.length}`]
+  ].map(([label, value]) => `<div><strong>${value}</strong><br><small>${label}</small></div>`).join("");
+  document.querySelector("#unlockGrid").innerHTML = unlocks.map((item) => {
+    const unlocked = item.unlocked();
+    const active = skinSelect.value === item.id;
+    return `<article><strong>${unlocked ? "✓ " : "🔒 "}${item.title}</strong><small>${item.detail}</small><small>${item.requirement}</small><button data-unlock="${item.id}" ${unlocked ? "" : "disabled"}>${active ? "Active" : unlocked ? "Use" : "Locked"}</button></article>`;
+  }).join("");
+  document.querySelectorAll("[data-unlock]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applySkin(button.dataset.unlock);
+      renderMenu();
+      showArenaBadge(`${unlocks.find((item) => item.id === button.dataset.unlock)?.title} applied`);
+      playSound("daily");
+    });
+  });
+}
+
 function playSound(type) {
   if (!soundToggle?.checked) return;
   audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
@@ -515,6 +597,7 @@ function render() {
   renderDailyTasks();
   renderCup();
   renderReplay();
+  renderUnlockOptions();
   updateTimers();
 }
 
@@ -700,6 +783,111 @@ function showToast(text) {
   setTimeout(() => toast.classList.remove("show"), 2400);
 }
 
+function roomFromUrl() {
+  const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+  return params.get("room") || "";
+}
+
+function randomRoomId() {
+  return `heckers-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function setRoomStatus(text) {
+  roomStatus.textContent = text;
+}
+
+function roomLink(roomId) {
+  const url = new URL(location.href);
+  url.hash = `room=${encodeURIComponent(roomId)}`;
+  return url.toString();
+}
+
+function sendRoomMessage(payload) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  socket.send(JSON.stringify({ roomId: state.roomId, ...payload }));
+}
+
+function connectRoom(role = "white") {
+  const roomId = (roomInput.value || randomRoomId()).trim();
+  const wsUrl = wsUrlInput.value.trim();
+  if (!wsUrl) {
+    showToast("Укажите WebSocket server URL");
+    return;
+  }
+  socket?.close();
+  state.mode = "online";
+  state.roomId = roomId;
+  state.onlineRole = role;
+  state.onlineConnected = false;
+  roomInput.value = roomId;
+  localStorage.setItem("heckers-ws-url", wsUrl);
+  history.replaceState(null, "", roomLink(roomId));
+  document.querySelectorAll("#modeGroup button").forEach((item) => item.classList.toggle("active", item.dataset.mode === "online"));
+  document.querySelector("#gameTitle").textContent = `Online room ${roomId}`;
+  setRoomStatus("Connecting...");
+  socket = new WebSocket(wsUrl);
+  socket.addEventListener("open", () => {
+    state.onlineConnected = true;
+    sendRoomMessage({ type: "join", role, board: state.board, turn: state.turn });
+    setRoomStatus(`Connected as ${role}. Invite link copied-ready: ${roomId}`);
+    showToast(`Online room ${roomId} подключена`);
+    saveState();
+    render();
+  });
+  socket.addEventListener("message", (event) => {
+    let message;
+    try {
+      message = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    if (message.roomId !== state.roomId) return;
+    handleRoomMessage(message);
+  });
+  socket.addEventListener("close", () => {
+    state.onlineConnected = false;
+    setRoomStatus("Disconnected. Проверьте WebSocket server и подключитесь снова.");
+    saveState();
+  });
+  socket.addEventListener("error", () => {
+    setRoomStatus("Connection error. Запустите relay server или укажите публичный wss:// URL.");
+    showToast("WebSocket не подключился");
+  });
+}
+
+function handleRoomMessage(message) {
+  if (message.type === "joined") {
+    setRoomStatus(`Room ${state.roomId}: ${message.count}/2 players online`);
+    return;
+  }
+  if (message.type === "sync" && message.board) {
+    state.board = message.board;
+    state.turn = message.turn || state.turn;
+    state.forcedFrom = message.forcedFrom || null;
+    state.winner = message.winner || null;
+    saveState();
+    render();
+    return;
+  }
+  if (message.type === "move" && message.move) {
+    applyMove(message.move, "remote", { remote: true });
+    playSound(message.move.capture ? "capture" : "move");
+    setRoomStatus(`Opponent moved ${notation(message.move.from)}-${notation(message.move.to)}`);
+  }
+  if (message.type === "reset" && message.board) {
+    state.board = message.board;
+    state.turn = "white";
+    state.moves = [];
+    state.snapshots = [];
+    state.winner = null;
+    state.forcedFrom = null;
+    state.selected = null;
+    state.legalMoves = [];
+    saveState();
+    render();
+  }
+}
+
 document.querySelector("#newGameButton").addEventListener("click", newGame);
 document.querySelector("#hintButton").addEventListener("click", () => {
   const moves = allMoves(state.board, state.turn);
@@ -721,6 +909,23 @@ document.querySelector("#dangerButton").addEventListener("click", () => {
   saveState();
   render();
 });
+document.querySelector("#menuButton").addEventListener("click", () => {
+  renderMenu();
+  document.querySelector("#menuDialog").showModal();
+});
+document.querySelector("#closeMenu").addEventListener("click", () => document.querySelector("#menuDialog").close());
+document.querySelector("#menuNewGame").addEventListener("click", () => {
+  document.querySelector("#menuDialog").close();
+  newGame();
+});
+document.querySelector("#menuDaily").addEventListener("click", () => {
+  document.querySelector("#menuDialog").close();
+  startChallenge();
+});
+document.querySelector("#menuFocus").addEventListener("click", () => {
+  document.querySelector("#menuDialog").close();
+  document.querySelector("#focusButton").click();
+});
 document.querySelector("#undoButton").addEventListener("click", () => {
   const snapshot = state.snapshots.pop();
   if (!snapshot) return showToast("Пока нечего отменять");
@@ -738,9 +943,11 @@ document.querySelector("#undoButton").addEventListener("click", () => {
   render();
 });
 document.querySelector("#shareButton").addEventListener("click", async () => {
-  const url = `${location.href.split("#")[0]}#room=${Math.random().toString(36).slice(2, 8)}`;
+  const roomId = state.roomId || roomInput.value || randomRoomId();
+  roomInput.value = roomId;
+  const url = roomLink(roomId);
   await navigator.clipboard?.writeText(url).catch(() => null);
-  showToast("Ссылка на матч скопирована. WebSocket-комната описана в README как следующий шаг.");
+  showToast("Invite link скопирован");
 });
 document.querySelector("#coachButton").addEventListener("click", () => {
   const moves = allMoves(state.board, state.turn);
@@ -800,21 +1007,35 @@ personaSelect.addEventListener("change", () => {
 });
 cityInput.addEventListener("input", renderLeaderboard);
 skinSelect.addEventListener("change", () => {
-  document.body.classList.remove("skin-cyber", "skin-school");
-  if (skinSelect.value !== "classic") document.body.classList.add(`skin-${skinSelect.value}`);
-  localStorage.setItem("heckers-skin", skinSelect.value);
+  if (!isSkinUnlocked(skinSelect.value)) {
+    showToast("Этот стиль еще закрыт. Выполните условие разблокировки.");
+    playSound("warning");
+    applySkin(localStorage.getItem("heckers-skin") || "classic", false);
+    return;
+  }
+  applySkin(skinSelect.value);
 });
 document.querySelector("#focusButton").addEventListener("click", () => {
   document.body.classList.toggle("focus-mode");
   showToast(document.body.classList.contains("focus-mode") ? "Focus mode включен" : "Focus mode выключен");
 });
+document.querySelector("#createRoomButton").addEventListener("click", async () => {
+  roomInput.value = roomInput.value || randomRoomId();
+  connectRoom("white");
+  await navigator.clipboard?.writeText(roomLink(roomInput.value)).catch(() => null);
+});
+document.querySelector("#joinRoomButton").addEventListener("click", () => connectRoom("black"));
 
 document.querySelectorAll("#modeGroup button").forEach((button) => {
   button.addEventListener("click", () => {
     document.querySelectorAll("#modeGroup button").forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
     state.mode = button.dataset.mode;
-    document.querySelector("#gameTitle").textContent = state.mode === "training" ? "Тренировка с подсказками" : state.mode === "local" ? "Матч на одном экране" : "Быстрая дуэль";
+    document.querySelector("#gameTitle").textContent =
+      state.mode === "training" ? "Тренировка с подсказками" :
+      state.mode === "local" ? "Матч на одном экране" :
+      state.mode === "online" ? "Online room" :
+      "Быстрая дуэль";
     saveState();
     maybeAiTurn();
   });
@@ -831,8 +1052,13 @@ document.querySelectorAll(".tabs button").forEach((button) => {
 
 if (localStorage.getItem("heckers-theme") === "dark") document.body.classList.add("dark");
 const savedSkin = localStorage.getItem("heckers-skin") || "classic";
-skinSelect.value = savedSkin;
-if (savedSkin !== "classic") document.body.classList.add(`skin-${savedSkin}`);
+applySkin(savedSkin, false);
+wsUrlInput.value = localStorage.getItem("heckers-ws-url") || wsUrlInput.value;
+const hashRoom = roomFromUrl();
+if (hashRoom) {
+  roomInput.value = hashRoom;
+  setRoomStatus(`Invite room detected: ${hashRoom}. Нажмите "Подключиться".`);
+}
 timerId = setInterval(tick, 1000);
 render();
 maybeAiTurn();

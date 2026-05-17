@@ -20,6 +20,7 @@
           </div>
         </div>
         <div class="top-actions">
+          <button class="ghost-button" id="menuButton" type="button" title="Открыть меню">☰</button>
           <button class="ghost-button" id="themeToggle" type="button" title="Сменить тему">☼</button>
           <button class="primary-button" id="proButton" type="button">Upgrade to Pro</button>
         </div>
@@ -90,6 +91,18 @@
               <button class="active" data-mode="ai" type="button">AI</button>
               <button data-mode="local" type="button">2 игрока</button>
               <button data-mode="training" type="button">Тренировка</button>
+              <button data-mode="online" type="button">Online</button>
+            </div>
+            <div class="multiplayer-box">
+              <label class="field-label" for="wsUrlInput">WebSocket server</label>
+              <input id="wsUrlInput" type="url" value="ws://localhost:8787" />
+              <label class="field-label" for="roomInput">Room code</label>
+              <input id="roomInput" type="text" placeholder="например: alma-2026" maxlength="32" />
+              <div class="room-actions">
+                <button id="createRoomButton" type="button">Создать</button>
+                <button id="joinRoomButton" type="button">Подключиться</button>
+              </div>
+              <div class="room-status" id="roomStatus">Offline multiplayer: создайте комнату или откройте invite link.</div>
             </div>
             <label class="field-label" for="difficulty">Сложность ИИ</label>
             <select id="difficulty">
@@ -118,6 +131,9 @@
               <option value="classic">Classic Arena</option>
               <option value="cyber">Cyber Mint</option>
               <option value="school">Kids School</option>
+              <option value="neon">Neon League · unlock</option>
+              <option value="royal">Royal Wood · unlock</option>
+              <option value="glass">Glass Pro · unlock</option>
             </select>
           </section>
 
@@ -254,6 +270,34 @@
       </div>
       <div class="report-grid" id="reportGrid"></div>
       <button class="primary-button wide" id="copyReport" type="button">Скопировать отчет</button>
+    </dialog>
+
+    <dialog id="menuDialog" class="menu-dialog">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Heckers menu</p>
+          <h2>Арена и прогресс</h2>
+        </div>
+        <button class="icon-button" id="closeMenu" type="button">×</button>
+      </div>
+      <div class="menu-grid">
+        <section>
+          <h3>Быстрый старт</h3>
+          <div class="menu-actions">
+            <button id="menuNewGame" type="button">Новая партия</button>
+            <button id="menuDaily" type="button">Задача дня</button>
+            <button id="menuFocus" type="button">Focus mode</button>
+          </div>
+        </section>
+        <section>
+          <h3>Профиль</h3>
+          <div class="menu-stats" id="menuStats"></div>
+        </section>
+        <section class="menu-wide">
+          <h3>Разблокировки</h3>
+          <div class="unlock-grid" id="unlockGrid"></div>
+        </section>
+      </div>
     </dialog>
 
     <dialog id="blunderDialog">

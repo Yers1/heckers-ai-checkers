@@ -41,6 +41,46 @@ body.skin-school {
   --accent-2: #326cbd;
 }
 
+body.skin-neon {
+  --bg: #111315;
+  --surface: #171d20;
+  --surface-strong: #202a2f;
+  --text: #effaf8;
+  --muted: #9bb4b0;
+  --line: #304248;
+  --dark-square: #12363b;
+  --light-square: #87fff1;
+  --accent: #ff3d8d;
+  --accent-2: #37f6c6;
+  --gold: #f8d84a;
+}
+
+body.skin-royal {
+  --bg: #20170f;
+  --surface: #2d2117;
+  --surface-strong: #3d2b1c;
+  --text: #fff3df;
+  --muted: #d6bea0;
+  --line: #5a4129;
+  --dark-square: #6c3f24;
+  --light-square: #d9b274;
+  --accent: #b82f2f;
+  --accent-2: #d5a535;
+}
+
+body.skin-glass {
+  --bg: #eaf4f2;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-strong: rgba(222, 239, 235, 0.82);
+  --text: #152629;
+  --muted: #587174;
+  --line: rgba(72, 105, 110, 0.28);
+  --dark-square: #49777b;
+  --light-square: #d8f4ed;
+  --accent: #0f7f95;
+  --accent-2: #9f3f72;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -442,11 +482,15 @@ dialog {
 .segmented,
 .tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 4px;
   padding: 4px;
   border-radius: 8px;
   border: 1px solid var(--line);
+}
+
+.tabs {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .segmented button,
@@ -493,6 +537,37 @@ input {
   border-radius: 8px;
   background: var(--surface);
   color: var(--text);
+}
+
+.multiplayer-box {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+}
+
+.room-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.room-actions button {
+  min-height: 38px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--surface);
+  font-weight: 900;
+}
+
+.room-status {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .coach-card {
@@ -661,6 +736,10 @@ dialog {
   color: var(--text);
 }
 
+.menu-dialog {
+  width: min(860px, calc(100% - 32px));
+}
+
 dialog::backdrop {
   background: rgba(0, 0, 0, 0.45);
 }
@@ -669,6 +748,66 @@ dialog::backdrop {
   display: grid;
   gap: 10px;
   margin: 16px 0;
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.menu-wide {
+  grid-column: 1 / -1;
+}
+
+.menu-actions,
+.menu-stats,
+.unlock-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-actions {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.menu-actions button {
+  min-height: 42px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--surface);
+  font-weight: 900;
+}
+
+.menu-stats,
+.unlock-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.menu-stats div,
+.unlock-grid article {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.unlock-grid article {
+  display: grid;
+  gap: 6px;
+}
+
+.unlock-grid button {
+  min-height: 34px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--surface);
+  font-weight: 900;
+}
+
+.unlock-grid button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .pricing-grid div {
@@ -877,6 +1016,13 @@ dialog::backdrop {
   }
 
   .dialog-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-grid,
+  .menu-actions,
+  .menu-stats,
+  .unlock-grid {
     grid-template-columns: 1fr;
   }
 }

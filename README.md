@@ -38,6 +38,8 @@ The product is aimed at students and casual players in Kazakhstan and nearby mar
 - **Academy Missions:** retention quests for wins, captures, hints, and daily challenges.
 - **Player Style DNA:** labels players as Hunter, Builder, or Balanced based on their decisions.
 - **Cosmetic Skins:** Classic Arena, Cyber Mint, and Kids School board styles as a monetization path.
+- **Achievement Unlocks:** new board/table styles unlock through XP, hints, City Cup progress, and daily tasks.
+- **Arena Menu:** a full in-app menu for starting games, launching daily tasks, toggling focus mode, viewing profile stats, and applying unlocked styles.
 - **City League:** a local leaderboard concept built around city identity, starting with Алматы.
 
 ## Why it is valuable
