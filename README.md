@@ -47,7 +47,7 @@ The product is aimed at students and casual players in Kazakhstan and nearby mar
 Most checkers apps stop at moving pieces. Heckers is positioned as a habit-forming training arena: fast matches, local identity through city rankings, post-game learning, and a clear path to monetization through Coach+, seasons, and cosmetic skins.
 
 ## How to run
-
+Open https://heckers-ai-checkers.vercel.app/
 Open `index.html` in a browser. No build step is required.
 
 For a deployed version, this can be uploaded as a static site to GitHub Pages, Netlify, Vercel, or Replit.
